@@ -34,10 +34,11 @@ const statusMsg       = $('status-msg');
 const newDownloadBtn  = $('new-download-btn');
 
 // ── State ──
-let currentVideo = null;   // full API response
-let selectedFormat = { type: 'video', ext: 'mp4' };
-let selectedQuality = null;
-let qualityFormats  = [];  // formats for current ext/type
+let currentVideo     = null;   // full API response
+let selectedFormat   = { type: 'video', ext: 'mp4' };
+let selectedQuality  = null;
+let selectedFormatId = null;   // exact yt-dlp format_id
+let qualityFormats   = [];
 
 
 // ── Helpers ──
@@ -95,6 +96,7 @@ function resetDownload() {
   downloadProgress.style.width = '0%';
   downloadBtn.disabled = false;
   newDownloadBtn.hidden = true;
+  selectedFormatId = null;
   setStatus('');
 }
 
@@ -212,6 +214,7 @@ formatPills.forEach(pill => {
     pill.classList.add('active');
     selectedFormat = { type: pill.dataset.type, ext: pill.dataset.ext };
     updateQualityPills();
+    resetDownload();
   });
 });
 
@@ -219,12 +222,15 @@ formatPills.forEach(pill => {
 // ── Quality Pills ──
 function updateQualityPills() {
   qualityPillsEl.innerHTML = '';
-  filesizeHint.textContent = '';
-  selectedQuality = null;
+  filesizeHint.textContent  = '';
+  selectedQuality  = null;
+  selectedFormatId = null;
 
+  // MP3 Audio — no quality needed
   if (selectedFormat.type === 'audio') {
     qualityGroup.style.display = 'none';
-    filesizeHint.textContent = 'MP3 at 192kbps';
+    filesizeHint.textContent   = 'MP3 • 192 kbps';
+    selectedFormatId = 'bestaudio/best';
     return;
   }
 
@@ -232,57 +238,47 @@ function updateQualityPills() {
 
   if (!currentVideo) return;
 
-  // Filter formats by extension
-  qualityFormats = currentVideo.formats.filter(
+  // Filter REAL formats for the selected extension
+  const matches = currentVideo.formats.filter(
     f => f.type === 'video' && f.ext === selectedFormat.ext
   );
 
-  // Standard quality labels to show in order
-  const standardQualities = ['4K', '2160p', '1440p', '1080p', '720p', '480p', '360p'];
-
-  // Find best matching formats
-  let displayFormats = [];
-  for (const q of standardQualities) {
-    const h = q === '4K' ? 2160 : parseInt(q);
-    const match = qualityFormats.find(f => f.height === h) ||
-                  qualityFormats.find(f => f.quality === q);
-    if (match && !displayFormats.find(d => d.quality === match.quality)) {
-      displayFormats.push(match);
-    }
+  if (matches.length === 0) {
+    // Format genuinely not available for this video
+    const msg = document.createElement('span');
+    msg.style.cssText = 'color:#f87171;font-size:0.82rem;';
+    msg.textContent = `No ${selectedFormat.ext.toUpperCase()} available for this video. Try MP4.`;
+    qualityPillsEl.appendChild(msg);
+    return;
   }
 
-  // If API returned formats but none matched standard labels, use raw
-  if (displayFormats.length === 0) {
-    displayFormats = qualityFormats.slice(0, 5);
-  }
+  // Sort by height descending
+  matches.sort((a, b) => (b.height || 0) - (a.height || 0));
 
-  // Always ensure at least 720p / best options
-  if (displayFormats.length === 0) {
-    ['1080p', '720p', '480p', '360p'].forEach(q => {
-      displayFormats.push({ quality: q, ext: selectedFormat.ext, type: 'video', filesize: null });
-    });
-  }
-
-  displayFormats.forEach((fmt, i) => {
+  matches.forEach((fmt, i) => {
     const btn = document.createElement('button');
-    btn.className = 'pill' + (i === 0 ? ' active' : '');
-    btn.textContent = fmt.quality;
-    btn.setAttribute('data-quality', fmt.quality);
-    btn.setAttribute('data-filesize', fmt.filesize || '');
+    btn.className       = 'pill' + (i === 0 ? ' active' : '');
+    btn.textContent     = fmt.quality;
+    btn.dataset.quality = fmt.quality;
+    btn.dataset.fmtId   = fmt.format_id || '';
+    btn.dataset.filesize = fmt.filesize || '';
 
     btn.addEventListener('click', () => {
       qualityPillsEl.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
-      selectedQuality = fmt.quality;
-      const size = formatFilesize(fmt.filesize);
+      selectedQuality  = fmt.quality;
+      selectedFormatId = fmt.format_id || null;
+      const size       = formatFilesize(fmt.filesize);
       filesizeHint.textContent = size ? `Estimated size: ${size}` : '';
     });
 
     qualityPillsEl.appendChild(btn);
 
+    // Auto-select first
     if (i === 0) {
-      selectedQuality = fmt.quality;
-      const size = formatFilesize(fmt.filesize);
+      selectedQuality  = fmt.quality;
+      selectedFormatId = fmt.format_id || null;
+      const size       = formatFilesize(fmt.filesize);
       filesizeHint.textContent = size ? `Estimated size: ${size}` : '';
     }
   });
@@ -317,7 +313,13 @@ downloadBtn.addEventListener('click', async () => {
     const res = await fetch('/api/download', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, ext, quality, type })
+      body: JSON.stringify({
+        url,
+        ext:       ext,
+        quality:   quality,
+        type:      type,
+        format_id: selectedFormatId || ''
+      })
     });
 
     clearInterval(progressInterval);
