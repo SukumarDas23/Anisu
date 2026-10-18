@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anisu — Download YouTube Videos Free</title>
+  <meta name="description" content="Anisu is the fastest free YouTube downloader. Download any YouTube video or audio in MP4, MP3, or WebM format instantly — no sign-up required." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+
+  <!-- Animated Background Blobs -->
+  <div class="bg-blobs" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <!-- Navbar -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-container">
+      <div class="nav-logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L13.09 8.26L19 6L15.45 11.13L21 13L15.45 14.87L19 20L13.09 15.74L12 22L10.91 15.74L5 20L8.55 14.87L3 13L8.55 11.13L5 6L10.91 8.26L12 2Z" fill="url(#logo-grad)"/>
+          <defs>
+            <linearGradient id="logo-grad" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#8b5cf6"/>
+              <stop offset="1" stop-color="#06b6d4"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="logo-text">Anisu</span>
+      </div>
+      <ul class="nav-links">
+        <li><a href="#" class="nav-link active" id="nav-home">Home</a></li>
+        <li><a href="#features" class="nav-link" id="nav-features">Features</a></li>
+        <li><a href="#how-it-works" class="nav-link" id="nav-how">How it works</a></li>
+      </ul>
+      <button class="nav-mobile-toggle" id="mobile-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <main class="hero" id="home">
+    <div class="hero-content">
+      <div class="hero-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="#8b5cf6"><circle cx="12" cy="12" r="10"/><path d="M10 8l6 4-6 4V8z" fill="white"/></svg>
+        <span>Free • Fast • No Sign Up</span>
+      </div>
+      <h1 class="hero-title">Download YouTube<br /><span class="gradient-text">Videos Instantly</span></h1>
+      <p class="hero-subtitle">Grab high-quality videos and audio in seconds.<br />No registration. No watermarks. No limits.</p>
+
+      <!-- Main Card -->
+      <div class="main-card" id="main-card">
+
+        <!-- URL Input Section -->
+        <div class="input-section" id="input-section">
+          <label class="input-label" for="url-input">YouTube URL</label>
+          <div class="input-row">
+            <div class="input-wrapper">
+              <svg class="yt-icon" viewBox="0 0 24 24" fill="none">
+                <rect width="24" height="24" rx="6" fill="#FF0000"/>
+                <path d="M10 8.5l6 3.5-6 3.5V8.5z" fill="white"/>
+              </svg>
+              <input
+                type="url"
+                id="url-input"
+                class="url-input"
+                placeholder="https://www.youtube.com/watch?v=..."
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button class="paste-btn" id="paste-btn" title="Paste from clipboard">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              </button>
+            </div>
+            <button class="fetch-btn" id="fetch-btn">
+              <span class="btn-text">Fetch Video</span>
+              <span class="btn-spinner" id="fetch-spinner" hidden></span>
+            </button>
+          </div>
+          <p class="input-hint" id="input-hint"></p>
+        </div>
+
+        <!-- Divider -->
+        <div class="card-divider" id="card-divider" hidden></div>
+
+        <!-- Video Preview Section -->
+        <div class="preview-section" id="preview-section" hidden>
+          <div class="video-info-card" id="video-info-card">
+            <div class="thumbnail-wrapper">
+              <img id="video-thumbnail" src="" alt="Video thumbnail" class="video-thumbnail" />
+              <span class="duration-badge" id="duration-badge">0:00</span>
+            </div>
+            <div class="video-meta">
+              <h2 class="video-title" id="video-title">Loading...</h2>
+              <div class="video-details">
+                <span class="channel-name" id="channel-name">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                  <span id="channel-text">Channel</span>
+                </span>
+                <span class="view-count" id="view-count">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                  <span id="views-text">0 views</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Format Selector -->
+          <div class="selector-group">
+            <p class="selector-label">Format</p>
+            <div class="pill-group" id="format-pills" role="group" aria-label="Select format">
+              <button class="pill active" data-type="video" data-ext="mp4" id="pill-mp4">MP4</button>
+              <button class="pill" data-type="audio" data-ext="mp3" id="pill-mp3">MP3 Audio</button>
+              <button class="pill" data-type="video" data-ext="webm" id="pill-webm">WebM</button>
+            </div>
+          </div>
+
+          <!-- Quality Selector -->
+          <div class="selector-group" id="quality-group">
+            <p class="selector-label">Quality</p>
+            <div class="pill-group" id="quality-pills" role="group" aria-label="Select quality">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <!-- File size estimate -->
+          <p class="filesize-hint" id="filesize-hint"></p>
+
+          <!-- Download Button -->
+          <button class="download-btn" id="download-btn">
+            <svg class="download-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span class="download-btn-text">Download Now</span>
+            <div class="download-progress" id="download-progress"></div>
+          </button>
+
+          <!-- Status message -->
+          <p class="status-msg" id="status-msg"></p>
+
+          <!-- New download link -->
+          <button class="new-download-btn" id="new-download-btn" hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+            Download another video
+          </button>
+        </div>
+
+      </div><!-- end main-card -->
+    </div>
+  </main>
+
+  <!-- Features Section -->
+  <section class="features-section" id="features">
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <h3>Lightning Fast</h3>
+        <p>Download at maximum speed with optimized servers and direct stream extraction.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+        </div>
+        <h3>No Sign Up</h3>
+        <p>No account, no email — just paste your URL and download. Your privacy matters.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22"/></svg>
+        </div>
+        <h3>Multiple Formats</h3>
+        <p>MP4, MP3, WebM — download in any format and quality from 360p up to 4K.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h3>No Watermark</h3>
+        <p>Get clean, watermark-free downloads every time. What you see is what you get.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works Section -->
+  <section class="how-section" id="how-it-works">
+    <h2 class="section-title">How It <span class="gradient-text">Works</span></h2>
+    <p class="section-subtitle">Three simple steps to download any YouTube video</p>
+    <div class="steps-row">
+      <div class="step">
+        <div class="step-number">01</div>
+        <h3>Paste URL</h3>
+        <p>Copy the YouTube link and paste it into the input field above.</p>
+      </div>
+      <div class="step-arrow">→</div>
+      <div class="step">
+        <div class="step-number">02</div>
+        <h3>Pick Format</h3>
+        <p>Choose your preferred format (MP4, MP3, WebM) and quality.</p>
+      </div>
+      <div class="step-arrow">→</div>
+      <div class="step">
+        <div class="step-number">03</div>
+        <h3>Download</h3>
+        <p>Hit Download Now and the file saves directly to your device.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L13.09 8.26L19 6L15.45 11.13L21 13L15.45 14.87L19 20L13.09 15.74L12 22L10.91 15.74L5 20L8.55 14.87L3 13L8.55 11.13L5 6L10.91 8.26L12 2Z" fill="url(#foot-grad)"/>
+          <defs>
+            <linearGradient id="foot-grad" x1="3" y1="2" x2="21" y2="22">
+              <stop stop-color="#8b5cf6"/><stop offset="1" stop-color="#06b6d4"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <span class="logo-text">Anisu</span>
+      </div>
+      <p class="footer-tagline">Download YouTube videos — fast, free, and hassle-free.</p>
+      <p class="footer-disclaimer">⚠️ For personal use only. Respect content creators and YouTube's Terms of Service.</p>
+      <p class="footer-copy">© 2026 Anisu. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
