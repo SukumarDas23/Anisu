@@ -12,31 +12,48 @@ CORS(app)
 DOWNLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'downloads')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# ── Browser headers ─────────────────────────────────────────────────────────
-HEADERS = {
-    'User-Agent': (
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-        'AppleWebKit/537.36 (KHTML, like Gecko) '
-        'Chrome/131.0.0.0 Safari/537.36'
-    ),
-    'Accept-Language': 'en-US,en;q=0.9',
-}
+BGUTIL_SCRIPT = '/home/ubuntu/bgutil-ytdlp-pot-provider/server/build/generate_once.js'
 
-# ── Base yt-dlp options (no client override — use yt-dlp default) ────────────
 YDL_BASE = {
     'quiet':       True,
     'no_warnings': True,
-    'http_headers': HEADERS,
+    'http_headers': {
+        'User-Agent': (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/131.0.0.0 Safari/537.36'
+        ),
+        'Accept-Language': 'en-US,en;q=0.9',
+    },
     'js_runtimes': {'node': {'cmd': '/usr/bin/node'}},
+
+    'external_downloader': 'aria2c',
+    'external_downloader_args': {
+        'aria2c': [
+            '--max-connection-per-server=16',
+            '--split=16',
+            '--min-split-size=1M',
+            '--continue=true',
+            '--summary-interval=0',
+        ]
+    },
+}
+
+BGUTIL_EXTRACTOR_ARGS = {
+    # web_embedded: returns all DASH streams (144p to 4K) with real URLs
+    # bgutil provides PO tokens so downloads work from datacenter IPs
+    'youtube': {'player_client': ['web_embedded']},
+    'youtubepot-bgutilscript': {
+        'script_path': [BGUTIL_SCRIPT]
+    },
 }
 
 
 def sanitize_filename(name):
-    return re.sub(r'[\\/*?:"<>|]', "", name)
+    return re.sub(r'[\/*?:"<>|]', '', name)
 
 
 def normalize_height(h):
-    """Map pixel height to a clean quality label."""
     if h >= 2000: return 2160, '4K'
     if h >= 1300: return 1440, '1440p'
     if h >= 900:  return 1080, '1080p'
@@ -47,83 +64,45 @@ def normalize_height(h):
     return 144, '144p'
 
 
-def make_ydl_opts(extra=None, with_cookies=True):
-    """Build yt-dlp options, optionally adding Firefox cookies."""
-    opts = {**YDL_BASE}
-    if with_cookies:
-        try:
-            # Only use cookies if Firefox cookie DB is accessible
-            firefox_profile = os.path.expanduser('~/.mozilla/firefox')
-            if os.path.exists(firefox_profile):
-                opts['cookiesfrombrowser'] = ('firefox',)
-        except Exception:
-            pass
+def make_ydl_opts(extra=None):
+    opts = {
+        **YDL_BASE,
+        'extractor_args': BGUTIL_EXTRACTOR_ARGS,
+        'remote_components': {'ejs': ['github']},
+    }
     if extra:
         opts.update(extra)
     return opts
 
 
 def extract_info_robust(url):
-    """Try to extract video info with multiple fallback strategies."""
     errors = []
-
-    # Strategy 1: Default client + cookies (best quality detection)
-    try:
-        opts = make_ydl_opts({'skip_download': True}, with_cookies=True)
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            return ydl.extract_info(url, download=False)
-    except Exception as e:
-        errors.append(f'[cookies] {e}')
-
-    # Strategy 2: Default client without cookies
-    try:
-        opts = make_ydl_opts({'skip_download': True}, with_cookies=False)
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            return ydl.extract_info(url, download=False)
-    except Exception as e:
-        errors.append(f'[no-cookies] {e}')
-
-    # Strategy 3: android+web client (older but sometimes works)
-    try:
-        opts = make_ydl_opts({
-            'skip_download': True,
-            'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
-        }, with_cookies=False)
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            return ydl.extract_info(url, download=False)
-    except Exception as e:
-        errors.append(f'[android] {e}')
-
+    clients = [
+        ['web_embedded'],
+        ['tv_embedded'],
+        ['web_embedded', 'tv_embedded'],
+    ]
+    for client in clients:
+        try:
+            args = {**BGUTIL_EXTRACTOR_ARGS, 'youtube': {'player_client': client}}
+            opts = {**YDL_BASE, 'skip_download': True,
+                    'extractor_args': args,
+                    'remote_components': {'ejs': ['github']}}
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                return ydl.extract_info(url, download=False)
+        except Exception as e:
+            errors.append(f'[{client}] {e}')
     raise RuntimeError(' | '.join(errors))
 
 
 def download_robust(url, fmt_str, merge_ext, output_path, post_processors=None):
-    """Try downloading with multiple fallback strategies."""
     errors = []
-
-    configs = [
-        # Strategy 1: With cookies + node.js
-        make_ydl_opts({
-            'format': fmt_str,
-            'outtmpl': output_path,
-            'noplaylist': True,
-            'merge_output_format': merge_ext,
-        }, with_cookies=True),
-        # Strategy 2: Without cookies
-        make_ydl_opts({
-            'format': fmt_str,
-            'outtmpl': output_path,
-            'noplaylist': True,
-            'merge_output_format': merge_ext,
-        }, with_cookies=False),
-        # Strategy 3: Fallback to 'best' (combined stream, no merge needed)
-        make_ydl_opts({
-            'format': 'best',
-            'outtmpl': output_path,
-            'noplaylist': True,
-        }, with_cookies=False),
-    ]
-
+    def _cfg(client):
+        args = {**BGUTIL_EXTRACTOR_ARGS, "youtube": {"player_client": client}}
+        return {**YDL_BASE, "format": fmt_str, "outtmpl": output_path,
+                "noplaylist": True, "merge_output_format": merge_ext,
+                "extractor_args": args, "remote_components": {"ejs": ["github"]}}
+    configs = [_cfg(["web_embedded"]), _cfg(["tv_embedded"]), _cfg(["web_embedded","tv_embedded"])]
     for cfg in configs:
         if post_processors:
             cfg['postprocessors'] = post_processors
@@ -149,10 +128,8 @@ def download_robust(url, fmt_str, merge_ext, output_path, post_processors=None):
         except Exception as e:
             msg = str(e)
             errors.append(msg)
-            # Don't retry on private/age-restricted — it won't help
             if 'Private' in msg or 'age' in msg.lower():
                 break
-            # Brief pause before retry
             time.sleep(1)
 
     raise RuntimeError(' | '.join(errors))
@@ -166,25 +143,22 @@ def index():
 @app.route('/api/info', methods=['POST'])
 def get_info():
     data = request.get_json()
-    url = data.get('url', '').strip()
+    url  = data.get('url', '').strip()
     if not url:
         return jsonify({'error': 'No URL provided'}), 400
 
     try:
         info = extract_info_robust(url)
-
-        # ── Build format list from REAL yt-dlp formats ──
         best_video = {}
 
         for f in info.get('formats', []):
-            height = f.get('height')
-            ext    = f.get('ext', '')
-            vcodec = f.get('vcodec', 'none')
-            proto  = f.get('protocol', '')
-            fid    = f.get('format_id', '')
+            height  = f.get('height')
+            ext     = f.get('ext', '')
+            vcodec  = f.get('vcodec', 'none')
+            proto   = f.get('protocol', '')
+            fid     = f.get('format_id', '')
             has_url = bool(f.get('url'))
 
-            # Include https + m3u8_native (HLS) — both have real download URLs
             if (height and vcodec != 'none'
                     and ext in ('mp4', 'webm')
                     and has_url
@@ -204,14 +178,11 @@ def get_info():
                         'tbr':       tbr,
                     }
 
-        # Sort: MP4 first (highest→lowest), then WebM
         ext_order = {'mp4': 0, 'webm': 1}
         formats = sorted(
             best_video.values(),
             key=lambda x: (ext_order.get(x['ext'], 9), -(x.get('height') or 0))
         )
-
-        # Add MP3 audio option
         formats.append({
             'format_id': 'bestaudio/best',
             'ext':       'mp3',
@@ -221,7 +192,6 @@ def get_info():
             'filesize':  None,
         })
 
-        # ── Best thumbnail ──
         thumbnail  = info.get('thumbnail', '')
         thumbnails = info.get('thumbnails', [])
         if thumbnails:
@@ -246,12 +216,12 @@ def get_info():
     except Exception as e:
         msg = str(e)
         if 'Sign in' in msg or 'bot' in msg.lower():
-            return jsonify({'error': 'YouTube bot check triggered. Open YouTube in Firefox, sign in, then retry.'}), 403
+            return jsonify({'error': 'YouTube bot check — please try again in a moment.'}), 403
         if 'Private' in msg:
             return jsonify({'error': 'This video is private.'}), 403
         if '429' in msg or 'Too Many' in msg:
-            return jsonify({'error': 'Too many requests — YouTube is rate limiting. Please wait 1–2 minutes and retry.'}), 429
-        return jsonify({'error': f'Could not fetch video: {msg[:200]}'}), 500
+            return jsonify({'error': 'Too many requests — please wait 1–2 minutes.'}), 429
+        return jsonify({'error': f'Could not fetch video info. Please try again.'}), 500
 
 
 @app.route('/api/download', methods=['POST'])
@@ -269,7 +239,7 @@ def download_video():
         output_path = os.path.join(DOWNLOAD_FOLDER, '%(title)s.%(ext)s')
 
         if fmt_type == 'audio':
-            fmt_str        = 'bestaudio/best'
+            fmt_str         = 'bestaudio/best'
             post_processors = [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -284,7 +254,6 @@ def download_video():
             except ValueError:
                 height_int = 720
 
-            # Robust format string: tries preferred ext → any ext → combined
             fmt_str = (
                 f'bestvideo[height<={height_int}][ext={fmt_ext}]+bestaudio[ext=m4a]'
                 f'/bestvideo[height<={height_int}][ext={fmt_ext}]+bestaudio'
@@ -298,19 +267,14 @@ def download_video():
             url, fmt_str, merge_ext, output_path, post_processors
         )
 
-        # Audio: extension changes after FFmpeg post-processing
         if fmt_type == 'audio' and downloaded_file:
             base = os.path.splitext(downloaded_file)[0]
             if os.path.exists(base + '.mp3'):
                 downloaded_file = base + '.mp3'
 
-        # Fallback: scan downloads folder for newest matching file
         if not downloaded_file or not os.path.exists(downloaded_file):
             title_key = sanitize_filename(info.get('title', ''))[:20].lower()
-            all_files = [
-                os.path.join(DOWNLOAD_FOLDER, f)
-                for f in os.listdir(DOWNLOAD_FOLDER)
-            ]
+            all_files = [os.path.join(DOWNLOAD_FOLDER, f) for f in os.listdir(DOWNLOAD_FOLDER)]
             candidates = [f for f in all_files if title_key in os.path.basename(f).lower()]
             if candidates:
                 downloaded_file = max(candidates, key=os.path.getmtime)
@@ -318,7 +282,7 @@ def download_video():
                 downloaded_file = max(all_files, key=os.path.getmtime)
 
         if not downloaded_file or not os.path.exists(downloaded_file):
-            return jsonify({'error': 'Downloaded file not found on server.'}), 500
+            return jsonify({'error': 'Downloaded file not found.'}), 500
 
         basename   = os.path.basename(downloaded_file)
         filesize   = os.path.getsize(downloaded_file)
@@ -330,14 +294,11 @@ def download_video():
         }
         mime = mime_map.get(actual_ext, 'application/octet-stream')
 
-        # Safe latin-1 filename + RFC 5987 UTF-8 fallback
-        safe_name = basename.encode('ascii', 'ignore').decode('ascii').strip()
-        if not safe_name:
-            safe_name = f'download{actual_ext}'
+        safe_name = basename.encode('ascii', 'ignore').decode('ascii').strip() or f'download{actual_ext}'
         utf8_name = urllib.parse.quote(basename, safe='')
         content_disposition = (
-            f"attachment; filename=\"{safe_name}\"; "
-            f"filename*=UTF-8''{utf8_name}"
+            f'attachment; filename="{safe_name}"; '
+            f'filename*=UTF-8\'\'{utf8_name}'
         )
 
         def generate():
@@ -360,13 +321,13 @@ def download_video():
 
     except Exception as e:
         msg = str(e)
-        if 'Sign in' in msg or 'bot' in msg.lower() or 'reload' in msg.lower():
-            return jsonify({'error': '⚠️ YouTube bot check. Open Firefox → go to youtube.com → sign in → retry.'}), 403
+        if 'bot' in msg.lower() or 'Sign in' in msg or 'reload' in msg.lower():
+            return jsonify({'error': 'YouTube temporarily blocked the request. Please retry in a moment.'}), 403
         if '429' in msg or 'Too Many' in msg:
-            return jsonify({'error': '⏳ YouTube rate limit hit. Wait 2–3 minutes then retry.'}), 429
+            return jsonify({'error': 'Too many requests — please wait 1–2 minutes.'}), 429
         if 'Private' in msg:
             return jsonify({'error': 'This video is private.'}), 403
-        return jsonify({'error': f'Download failed: {msg[:300]}'}), 500
+        return jsonify({'error': 'Download failed — please try again.'}), 500
 
 
 if __name__ == '__main__':
